@@ -4,6 +4,9 @@ import (
 	"embed"
 	"html/template"
 	"net/http"
+	"sort"
+	"unicode"
+	"unicode/utf8"
 
 	"go.mkw.re/ghidra-panel/common"
 	"go.mkw.re/ghidra-panel/database"
@@ -37,6 +40,7 @@ func init() {
 type Config struct {
 	GhidraEndpoint    *common.GhidraEndpoint
 	Links             []common.Link
+	DiscordApp        *discord.Application
 	DiscordWebhookURL string
 	Dev               bool // developer mode
 }
@@ -72,7 +76,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/redirect", s.handleOAuthRedirect)
 	mux.HandleFunc("/logout", s.handleLogout)
 
-	mux.HandleFunc("/update_password", s.handleUpdatePassword)
+	mux.HandleFunc("/create_account", s.handleCreateAccount)
+	mux.HandleFunc("/update_account", s.handleUpdateAccount)
 	mux.HandleFunc("/request_access", s.handleRequestAccess)
 
 	// Create file server for assets
@@ -86,7 +91,9 @@ type State struct {
 	Nav       []Nav         // navigation bar
 	Links     []common.Link // footer links
 	Ghidra    *common.GhidraEndpoint
-	ACL       []common.UserRepoAccess
+	ACL       []common.UserRepoAccessDisplay
+	Repos     []string
+	Status    string
 }
 
 type Nav struct {
@@ -94,11 +101,12 @@ type Nav struct {
 	Name  string
 }
 
-func (s *Server) stateWithNav(nav ...Nav) *State {
+func (s *Server) stateWithNav(req *http.Request, nav ...Nav) *State {
 	return &State{
 		Ghidra: s.Config.GhidraEndpoint,
 		Nav:    nav,
 		Links:  s.Config.Links,
+		Status: req.URL.Query().Get("status"),
 	}
 }
 
@@ -117,21 +125,60 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 
 	state.Identity = ident
 
-	userState, err := s.DB.GetUserState(req.Context(), ident.ID)
+	userState, err := s.DB.GetUserState(req.Context(), ident)
 	if err != nil {
 		http.Error(wr, "failed to get user state, please contact server admin", http.StatusInternalServerError)
 		return false
 	}
 	state.UserState = userState
 
-	acl := s.ACLs.Get().QueryUser(ident.Username)
-	state.ACL = make([]common.UserRepoAccess, len(acl))
-	for i, v := range acl {
-		state.ACL[i] = common.UserRepoAccess{
-			Repo: v.Repo,
-			Perm: ghidra.PermStrs[v.Perm],
-		}
+	// Check if there's a matching legacy Ghidra account
+	if !state.UserState.HasPassword {
+		hash := s.ACLs.Get().QueryLegacyUser(state.UserState.Username)
+		state.UserState.HasLegacyAccount = hash != ""
 	}
 
+	// Query for repository access
+	acl := s.ACLs.Get().QueryUser(state.UserState.Username)
+	state.ACL = make([]common.UserRepoAccessDisplay, len(acl))
+	for i, v := range acl {
+		state.ACL[i] = common.UserRepoAccessDisplay{
+			Repo: v.Repo,
+			Perm: ghidra.PermDisplay[v.Perm],
+		}
+	}
+	sort.Slice(state.ACL, func(i, j int) bool { return lessCaseInsensitive(state.ACL[i].Repo, state.ACL[j].Repo) })
+
+	// Query for repository list
+	state.Repos = s.ACLs.Get().QueryRepos()
+	sort.Slice(state.Repos, func(i, j int) bool { return lessCaseInsensitive(state.Repos[i], state.Repos[j]) })
+
 	return true
+}
+
+// lessCaseInsensitive compares s, t without allocating
+func lessCaseInsensitive(s, t string) bool {
+	for {
+		if len(t) == 0 {
+			return false
+		}
+		if len(s) == 0 {
+			return true
+		}
+		c, sizec := utf8.DecodeRuneInString(s)
+		d, sized := utf8.DecodeRuneInString(t)
+
+		lowerc := unicode.ToLower(c)
+		lowerd := unicode.ToLower(d)
+
+		if lowerc < lowerd {
+			return true
+		}
+		if lowerc > lowerd {
+			return false
+		}
+
+		s = s[sizec:]
+		t = t[sized:]
+	}
 }

@@ -22,10 +22,21 @@ nav > ul:first-child > li:not(:last-child):after {
   padding-left: 10px;
 }
 
-.funky-kong {
-  background-image: url("/assets/Funky_Kong.webp");
-  background-position: center;
-  background-size: cover;
-  height: 56px;
-  width: 56px;
+article {
+  --block-spacing-vertical: calc(var(--spacing) * 2);
+  margin-top: 0;
+}
+
+article.alert {
+  padding: calc(var(--block-spacing-vertical) * 0.5) var(--block-spacing-horizontal);
+}
+
+article.success {
+  background-color: #353;
+  color: #fff;
+}
+
+article.error {
+  background-color: #833;
+  color: #fff;
 }

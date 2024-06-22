@@ -5,7 +5,7 @@
 
     <groupId>re.mkw</groupId>
     <artifactId>ghidra-panel-jaas</artifactId>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
 
     <build>
         <plugins>
@@ -16,6 +16,22 @@
                 <configuration>
                     <source>8</source>
                     <target>8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
                 </configuration>
             </plugin>
         </plugins>

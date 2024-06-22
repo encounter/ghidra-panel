@@ -19,10 +19,10 @@ const (
 
 const AnonAllowedStr = "=ANONYMOUS_ALLOWED"
 
-var PermStrs = []string{
-	PermRead:  PermReadStr,
-	PermWrite: PermWriteStr,
-	PermAdmin: PermAdminStr,
+var PermDisplay = []string{
+	PermRead:  "Read",
+	PermWrite: "Write",
+	PermAdmin: "Admin",
 }
 
 // ACL is an in-memory representation of a repo access list.
@@ -53,14 +53,24 @@ func ReadACL(scn *bufio.Scanner) (acl *ACL, err error) {
 		}
 		userName := strings.TrimSpace(parts[0])
 		roleName := strings.TrimSpace(parts[1])
-		switch roleName {
-		case PermReadStr:
-			acl.Users[userName] = PermRead
-		case PermWriteStr:
-			acl.Users[userName] = PermWrite
-		case PermAdminStr:
-			acl.Users[userName] = PermAdmin
+		perm := PermFromString(roleName)
+		if perm == -1 {
+			continue
 		}
+		acl.Users[userName] = perm
 	}
 	return acl, scn.Err()
+}
+
+func PermFromString(s string) int {
+	switch s {
+	case PermReadStr:
+		return PermRead
+	case PermWriteStr:
+		return PermWrite
+	case PermAdminStr:
+		return PermAdmin
+	default:
+		return -1
+	}
 }

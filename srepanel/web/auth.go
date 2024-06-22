@@ -17,6 +17,7 @@ func (s *Server) handleLogin(wr http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 		state := s.stateWithNav(
+			req,
 			Nav{Route: "/", Name: "Ghidra"},
 			Nav{Route: "/login", Name: "Login"},
 		)

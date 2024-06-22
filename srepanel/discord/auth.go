@@ -11,6 +11,27 @@ import (
 	"go.mkw.re/ghidra-panel/csrf"
 )
 
+func GetApplication(ctx context.Context, botToken string) (*Application, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://discord.com/api/applications/@me", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bot "+botToken)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	app := Application{}
+	if err := json.NewDecoder(res.Body).Decode(&app); err != nil {
+		return nil, err
+	}
+
+	return &app, nil
+}
+
 var Endpoint = oauth2.Endpoint{
 	AuthURL:   "https://discord.com/oauth2/authorize",
 	TokenURL:  "https://discord.com/api/oauth2/token",

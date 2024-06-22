@@ -12,7 +12,10 @@ type GhidraEndpoint struct {
 }
 
 type UserState struct {
+	Username    string
 	HasPassword bool
+	// Whether a legacy Ghidra account exists with this username
+	HasLegacyAccount bool
 }
 
 type Link struct {
@@ -20,7 +23,7 @@ type Link struct {
 	URL  string `json:"url"`
 }
 
-type UserRepoAccess struct {
+type UserRepoAccessDisplay struct {
 	Repo string
 	Perm string
 }

@@ -1,5 +1,16 @@
 package discord
 
+// --------------- //
+// Application API //
+// --------------- //
+
+// https://discord.com/developers/docs/resources/application#application-object
+type Application struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Icon string `json:"icon"`
+}
+
 // ----------- //
 // Channel API //
 // ----------- //
@@ -19,10 +30,12 @@ type EmbedField struct {
 
 // https://discord.com/developers/docs/resources/channel#embed-object
 type Embed struct {
-	Title  string       `json:"title"`
-	Color  int          `json:"color"`
-	Author EmbedAuthor  `json:"author"`
-	Fields []EmbedField `json:"fields"`
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	Color       int          `json:"color"`
+	Author      EmbedAuthor  `json:"author"`
+	Fields      []EmbedField `json:"fields"`
+	Timestamp   string       `json:"timestamp"`
 }
 
 // ----------- //

@@ -212,7 +212,7 @@ public class PanelLoginModule implements LoginModule {
       rs = stmt.executeQuery();
       if (!rs.next()) {
         // TODO make URL configurable
-        throw new LoginException("Please set your password at https:/panel.mkw.re");
+        throw new LoginException("Please set your password at https://ghidra.decomp.dev");
       }
 
       this.pwSalt = rs.getBytes(1);

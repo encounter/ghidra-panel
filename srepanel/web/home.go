@@ -11,7 +11,7 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	state := s.stateWithNav(Nav{Route: "/", Name: "Ghidra"})
+	state := s.stateWithNav(req, Nav{Route: "/", Name: "Ghidra"})
 	if !s.authenticateState(wr, req, state) {
 		return
 	}

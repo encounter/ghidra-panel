@@ -1,5 +1,6 @@
 {
   "discord": {
+    "bot_token": "xxx",
     "client_id": "xxx",
     "client_secret": "xxx",
     "webhook_url": "xxx"

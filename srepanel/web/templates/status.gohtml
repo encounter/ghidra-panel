@@ -1,0 +1,37 @@
+{{ if eq .Status "create_account_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Your account has been created.
+</article>
+{{ else if eq .Status "link_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Your account has been linked.
+</article>
+{{ else if eq .Status "update_account_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Your account has been updated.
+</article>
+{{ else if eq .Status "request_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Access request has been sent.
+</article>
+{{ else if eq .Status "username_exists" }}
+<article class="alert error">
+  <strong>Oops.</strong> The username you entered already exists.
+</article>
+{{ else if eq .Status "missing_fields" }}
+<article class="alert error">
+  <strong>Oops.</strong> Please provide all required fields.
+</article>
+{{ else if eq .Status "link_failed" }}
+<article class="alert error">
+  <strong>Oops.</strong> The password did not match the existing account.
+</article>
+{{ else if eq .Status "request_redundant" }}
+<article class="alert error">
+  <strong>Oops.</strong> You already have access to this repository.
+</article>
+{{ else if eq .Status "internal_error" }}
+<article class="alert error">
+  <strong>Oops.</strong> Something went wrong. Please try again later.
+</article>
+{{ end }}

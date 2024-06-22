@@ -53,6 +53,7 @@ func (a *ACLMon) updateACLs() (*ACLState, error) {
 		return nil, fmt.Errorf("failed to discover repos: %w", err)
 	}
 	acls := NewACLState()
+	acls.ReadUsers(a.Dir)
 	for _, repoPath := range repos {
 		if err := acls.AddRepoDir(repoPath); err != nil {
 			return nil, fmt.Errorf("failed to add repo: %w", err)
@@ -88,6 +89,7 @@ func DiscoverRepos(dir string) ([]string, error) {
 // Immutable object, safe to read concurrently.
 type ACLState struct {
 	UpdatedAt  time.Time
+	Users      Users
 	ACLs       map[string]*ACL             // repo => ACL
 	AnonAccess []string                    // repos with anon access
 	UserAccess map[string][]UserRepoAccess // user => repos
@@ -102,13 +104,25 @@ type UserRepoAccess struct {
 func NewACLState() *ACLState {
 	return &ACLState{
 		UpdatedAt:  time.Now(),
+		Users:      make(Users),
 		ACLs:       make(map[string]*ACL),
 		UserAccess: make(map[string][]UserRepoAccess),
 	}
 }
 
+// Ghidra repo directory names use _ to denote uppercase letters.
+func repoNameFromDir(repoDir string) string {
+	base := filepath.Base(repoDir)
+	for i := 0; i < len(base); i++ {
+		if base[i] == '_' {
+			base = base[:i] + string(base[i+1]-32) + base[i+2:]
+		}
+	}
+	return base
+}
+
 func (acls *ACLState) AddRepoDir(repoDir string) error {
-	repo := filepath.Base(repoDir)
+	repo := repoNameFromDir(repoDir)
 	aclPath := filepath.Join(repoDir, "userAccess.acl")
 	f, err := os.Open(aclPath)
 	if err != nil {
@@ -144,4 +158,57 @@ func (acls *ACLState) QueryUser(user string) []UserRepoAccess {
 		return nil
 	}
 	return acls.UserAccess[user]
+}
+
+func (acls *ACLState) QueryUserAccess(user, repo string) int {
+	if acls == nil {
+		return -1
+	}
+	for _, access := range acls.UserAccess[user] {
+		if access.Repo == repo {
+			return access.Perm
+		}
+	}
+	return -1
+}
+
+func (acls *ACLState) ReadUsers(dir string) *Users {
+	f, err := os.Open(filepath.Join(dir, "users"))
+	if err != nil {
+		log.Printf("failed to open users file: %v", err)
+		return nil
+	}
+	defer f.Close()
+
+	scn := bufio.NewScanner(f)
+	err = ReadUsers(&acls.Users, scn)
+	if err != nil {
+		log.Printf("failed to read users file: %v", err)
+		return nil
+	}
+	return &acls.Users
+}
+
+// QueryLegacyUser returns the legacy Ghidra password hash for a user.
+// Returns empty string if user does not exist or has no password.
+func (acls *ACLState) QueryLegacyUser(user string) string {
+	if acls == nil {
+		return ""
+	}
+	hash, ok := acls.Users[user]
+	if !ok || hash == "*" {
+		return ""
+	}
+	return hash
+}
+
+func (acls *ACLState) QueryRepos() []string {
+	if acls == nil {
+		return nil
+	}
+	repos := make([]string, 0, len(acls.ACLs))
+	for repo := range acls.ACLs {
+		repos = append(repos, repo)
+	}
+	return repos
 }

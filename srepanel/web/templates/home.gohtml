@@ -27,10 +27,11 @@
 {{ template "nav.gohtml" . }}
 <main class="container">
   <h1>Hi, {{ .Identity.Username }}!</h1>
+  {{ template "status.gohtml" . }}
   <div class="grid">
   <article>
     <header>
-      <strong>Review Access</strong>
+      <strong>Repository Access</strong>
     </header>
     {{ if .ACL | len  }}
     <ul>
@@ -39,47 +40,86 @@
       {{ end }}
     </ul>
     {{ else }}
-    <p>Your account does not have any access to Ghidra repositories.</p>
+    <p>Your account doesn't have access to any repositories yet.</p>
+    {{ end }}
     {{ if .UserState.HasPassword }}
     <form action="/request_access" method="post">
-      <button role="button" type="submit" class="outline">Request Access</button>
+      <label for="repo">Repositories</label>
+      <select id="repo" name="repo" required>
+        <option value="" disabled selected>Select a repository...</option>
+        {{ range $repo := .Repos }}
+        <option value="{{ $repo }}">{{ $repo }}</option>
+        {{ end }}
+      </select>
+      <label for="role">Role</label>
+      <div class="password_row">
+        <select id="role" name="role" required>
+          <option value="" disabled selected>Select a role...</option>
+          <option value="READ_ONLY">Read</option>
+          <option value="WRITE">Write</option>
+          <option value="ADMIN">Admin</option>
+        </select>
+        <button role="button" type="submit" class="outline">Request</button>
+      </div>
     </form>
-    {{ else }}
-      <p>You cannot request access to Ghidra repositories without setting a password. Please set one to continue!</p>
     {{ end }}
-  {{ end }}
   </article>
   <article>
+    {{ if not .UserState.HasPassword }}
     <header>
-      <strong>Update Ghidra Credentials</strong>
+      <strong>Ghidra Account</strong>
     </header>
-    <form action="/update_password" method="post">
+    <form action="/create_account" method="post">
+      <p>If you have an existing account, enter the credentials here.</p>
+
+      <label for="create-username">Username</label>
+      {{ if .UserState.HasLegacyAccount }}
+      <input id="create-username" type="text" name="username" value="{{ .UserState.Username }}" disabled>
+      <small>An existing Ghidra account with this username was found.</small>
+      {{ else }}
+      <input id="create-username" type="text" name="username" value="{{ .UserState.Username }}" required>
+      <small>Username is case-sensitive and cannot be changed.</small>
+      {{ end }}
+
+      <label for="create-password">Password</label>
+      <input id="create-password" type="password" name="password" required>
+      <small>Please do not share your password with anyone else.</small>
+
+      <div class="grid">
+        {{ if .UserState.HasLegacyAccount }}
+        <button role="button" type="submit">Link</button>
+        {{ else }}
+        <button role="button" type="submit">Create</button>
+        {{ end }}
+      </div>
+    </form>
+    {{ else }}
+    <header>
+      <strong>Connection Information</strong>
+    </header>
+    <form action="/update_account" method="post">
       <div class="grid">
         <label for="hostname">
           Hostname
-          <input id="hostname" type="text" value="{{ .Ghidra.Hostname }}" readonly>
+          <input id="hostname" type="text" value="{{ .Ghidra.Hostname }}" disabled>
         </label>
         <label for="port">
           Port
-          <input id="port" type="text" value="{{ .Ghidra.Port }}" readonly>
+          <input id="port" type="text" value="{{ .Ghidra.Port }}" disabled>
         </label>
       </div>
 
-      <label for="username">Username</label>
-      <input id="username" type="text" value="{{ .Identity.Username }}" readonly>
+      <label for="update-username">Username</label>
+      <input id="update-username" type="text" name="username" value="{{ .UserState.Username }}" disabled>
+      <small>Username is case-sensitive and cannot be changed.</small>
 
+      <label for="update-password">Password</label>
       <div class="password_row">
-        <label for="password">
-          Password
-          <input id="password" type="password" name="password" placeholder="Enter new password..." required>
-          <small>Please do not share your password with anyone else.</small>
-        </label>
-
-        <button role="button" type="submit" class="outline">Update Password</button>
+        <input id="update-password" type="password" name="password" placeholder="Enter new password..." required>
+        <button role="button" type="submit" class="outline">Update</button>
       </div>
+      <small>Please do not share your password with anyone else.</small>
     </form>
-    {{ if not .UserState.HasPassword }}
-    <p><mark>Your account does not have a Ghidra password. Please set one!</mark></p>
     {{ end }}
   </article>
   </div>

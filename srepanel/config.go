@@ -9,6 +9,7 @@ import (
 type config struct {
 	BaseURL string `json:"base_url"`
 	Discord struct {
+		BotToken     string `json:"bot_token"`
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
 		// TODO allow for more general webhooks
