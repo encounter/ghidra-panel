@@ -134,8 +134,8 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 
 	// Check if there's a matching legacy Ghidra account
 	if !state.UserState.HasPassword {
-		hash := s.ACLs.Get().QueryLegacyUser(state.UserState.Username)
-		state.UserState.HasLegacyAccount = hash != ""
+		u, _ := s.ACLs.Get().QueryLegacyUser(state.UserState.Username)
+		state.UserState.LegacyAccountUsername = u
 	}
 
 	// Query for repository access

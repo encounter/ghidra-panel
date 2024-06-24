@@ -14,8 +14,8 @@ type GhidraEndpoint struct {
 type UserState struct {
 	Username    string
 	HasPassword bool
-	// Whether a legacy Ghidra account exists with this username
-	HasLegacyAccount bool
+	// Legacy Ghidra account username, if any
+	LegacyAccountUsername string
 }
 
 type Link struct {

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -191,15 +192,21 @@ func (acls *ACLState) ReadUsers(dir string) *Users {
 
 // QueryLegacyUser returns the legacy Ghidra password hash for a user.
 // Returns empty string if user does not exist or has no password.
-func (acls *ACLState) QueryLegacyUser(user string) string {
+func (acls *ACLState) QueryLegacyUser(user string) (username string, hash string) {
 	if acls == nil {
-		return ""
+		return "", ""
 	}
-	hash, ok := acls.Users[user]
-	if !ok || hash == "*" {
-		return ""
+	for u, h := range acls.Users {
+		if strings.EqualFold(u, user) {
+			username = u
+			hash = h
+			break
+		}
 	}
-	return hash
+	if hash == "" || hash == "*" {
+		return "", ""
+	}
+	return
 }
 
 func (acls *ACLState) QueryRepos() []string {

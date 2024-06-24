@@ -49,10 +49,15 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 	}
 
 	// If a legacy Ghidra account exists, make sure the password matches
-	hash := s.ACLs.Get().QueryLegacyUser(user)
-	if hash != "" && !ghidra.ComparePassword(hash, pass) {
-		http.Redirect(wr, req, "/?status=link_failed", http.StatusSeeOther)
-		return
+	legacyUser, hash := s.ACLs.Get().QueryLegacyUser(user)
+	if hash != "" {
+		if ghidra.ComparePassword(hash, pass) {
+			// Ensure we use the same case
+			user = legacyUser
+		} else {
+			http.Redirect(wr, req, "/?status=link_failed", http.StatusSeeOther)
+			return
+		}
 	}
 
 	if err := s.DB.CreateAccount(req.Context(), ident.ID, user, pass); err != nil {
