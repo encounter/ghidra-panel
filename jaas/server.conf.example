@@ -1,0 +1,15 @@
+// ghidra/server/server.conf
+
+# Override main class for gRPC server
+wrapper.java.app.mainclass=re.mkw.srejaas.PanelServer
+
+# Panel plugin classpath
+wrapper.java.classpath.Panel=/path/to/build/libs/ghidra-panel-jaas.jar
+
+# Configure JAAS login module
+wrapper.app.parameter.1=-a4
+wrapper.app.parameter.2=-jaas
+wrapper.app.parameter.3=jaas.conf
+wrapper.app.parameter.4=-u
+wrapper.app.parameter.5=-autoProvision
+wrapper.app.parameter.6=${ghidra.repositories.dir}

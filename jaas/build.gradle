@@ -1,0 +1,102 @@
+// An absolute path to the Ghidra installation directory must be supplied either by setting the
+// GHIDRA_INSTALL_DIR environment variable or Gradle project property:
+//
+//     > export GHIDRA_INSTALL_DIR=<Absolute path to Ghidra>
+//     > gradle
+//
+//         or
+//
+//     > gradle -PGHIDRA_INSTALL_DIR=<Absolute path to Ghidra>
+//
+// Gradle should be invoked from the directory of the project to build.  Please see the
+// application.gradle.version property in <GHIDRA_INSTALL_DIR>/Ghidra/application.properties
+// for the correction version of Gradle to use for the Ghidra installation you specify.
+
+plugins {
+    id 'java-library'
+    id 'com.google.protobuf' version '0.9.4'
+}
+
+group = 're.mkw'
+version = '1.0.0'
+
+//----------------------START "DO NOT MODIFY" SECTION------------------------------
+def ghidraInstallDir = null
+
+if (System.env.GHIDRA_INSTALL_DIR) {
+    ghidraInstallDir = System.env.GHIDRA_INSTALL_DIR
+} else if (project.hasProperty("GHIDRA_INSTALL_DIR")) {
+    ghidraInstallDir = project.getProperty("GHIDRA_INSTALL_DIR")
+}
+if (ghidraInstallDir == null) {
+    throw new GradleException("GHIDRA_INSTALL_DIR is not defined!")
+}
+
+def ghidraDir = ghidraInstallDir + "/Ghidra"
+//----------------------END "DO NOT MODIFY" SECTION-------------------------------
+
+repositories {
+    mavenCentral()
+}
+
+def grpcVersion = '1.65.0'
+def protobufVersion = '3.25.1'
+def protocVersion = protobufVersion
+
+dependencies {
+    // Ghidra
+    compileOnly fileTree(dir: ghidraDir + '/Framework', include: '**/*.jar')
+    compileOnly fileTree(dir: ghidraDir + '/Features', include: '**/*.jar')
+    compileOnly fileTree(dir: ghidraDir + '/Debug', include: '**/*.jar')
+    compileOnly fileTree(dir: ghidraDir + '/Processors', include: '**/*.jar')
+
+    // JDBC
+    runtimeOnly 'org.xerial:sqlite-jdbc:3.42.0.0'
+
+    // gRPC
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-services:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    implementation "io.grpc:grpc-netty:${grpcVersion}"
+    implementation 'io.netty:netty-transport-native-epoll:4.1.86.Final'
+    runtimeOnly "io.grpc:grpc-netty-shaded:${grpcVersion}"
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:${protocVersion}" }
+    plugins {
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}" }
+    }
+    generateProtoTasks {
+        all()*.plugins { grpc {} }
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/source/proto/main/grpc'
+            srcDirs 'build/generated/source/proto/main/java'
+        }
+    }
+}
+
+jar {
+    archiveVersion = ""
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from {
+        configurations.runtimeClasspath.collect {
+            // println("Including: " + it)
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+
+    manifest {
+        attributes(
+            'Main-Class': 're.mkw.srejaas.PanelServer',
+            'Implementation-Version': version
+        )
+    }
+}

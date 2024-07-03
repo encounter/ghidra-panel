@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Ghidra Panel - Repo</title>
+    {{ template "head.gohtml" }}
+</head>
+<body>
+{{ template "nav.gohtml" . }}
+<main class="container">
+    <h1>{{ .RepoName }}</h1>
+    {{ template "status.gohtml" . }}
+    <div class="grid">
+        <article>
+            <header>
+                <strong>Users</strong>
+            </header>
+            {{ if .ACL | len  }}
+            <ul class="list">
+            {{ range $acl := .ACL }}
+            <li>
+                <samp>{{ .User }}</samp>
+                <span style="color: {{ permColor .Perm }}">{{ permDisplay .Perm }}</span>
+                <form action="/set_user_access" method="post">
+                    <input type="hidden" name="repo" value="{{ $.RepoName }}">
+                    <input type="hidden" name="user" value="{{ .User }}">
+                    <input type="hidden" name="role" value="NONE">
+                    <button class="small outline secondary"><i class="fa-solid fa-xmark"></i></button>
+                </form>
+            </li>
+            {{ end }}
+            </ul>
+            {{ else }}
+            <p>No users added to repository.</p>
+            {{ end }}
+        </article>
+        <article>
+            <header>
+                <strong>Add User</strong>
+            </header>
+            <form action="/set_user_access" method="post">
+                <input type="hidden" name="repo" value="{{ .RepoName }}">
+                <label for="user">Users</label>
+                <select id="user" name="user" required>
+                    <option value="" disabled selected>Select a user...</option>
+                    {{ range $users := .Users }}
+                        {{ if eq $users $.QueryUser }}
+                            <option value="{{ $users }}" selected>{{ $users }}</option>
+                        {{ else }}
+                            <option value="{{ $users }}">{{ $users }}</option>
+                        {{ end }}
+                    {{ end }}
+                </select>
+                <label for="role">Role</label>
+                <div class="password_row">
+                    <select id="role" name="role" required>
+                        <option value="" disabled selected>Select a role...</option>
+                        {{ if eq .QueryRole "READ_ONLY" }}
+                            <option value="READ_ONLY" selected>Read</option>
+                        {{ else }}
+                            <option value="READ_ONLY">Read</option>
+                        {{ end }}
+                        {{ if eq .QueryRole "WRITE" }}
+                            <option value="WRITE" selected>Write</option>
+                        {{ else }}
+                            <option value="WRITE">Write</option>
+                        {{ end }}
+                        {{ if eq .QueryRole "ADMIN" }}
+                            <option value="ADMIN" selected>Admin</option>
+                        {{ else }}
+                            <option value="ADMIN">Admin</option>
+                        {{ end }}
+                    </select>
+                    <button role="button" type="submit" class="outline">Add</button>
+                </div>
+            </form>
+        </article>
+    </div>
+</main>
+{{ template "footer.gohtml" . }}
+</body>
+</html>

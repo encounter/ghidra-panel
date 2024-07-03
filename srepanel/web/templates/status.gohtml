@@ -14,6 +14,14 @@
 <article class="alert success">
   <strong>Success!</strong> Access request has been sent.
 </article>
+{{ else if eq .Status "set_access_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Access updated for user <samp>{{ .StatusUser }}</samp>.
+</article>
+{{ else if eq .Status "user_prefilled" }}
+<article class="alert success">
+  Click "Add" to accept the access request.
+</article>
 {{ else if eq .Status "username_exists" }}
 <article class="alert error">
   <strong>Oops.</strong> The username you entered already exists.
@@ -29,6 +37,10 @@
 {{ else if eq .Status "request_redundant" }}
 <article class="alert error">
   <strong>Oops.</strong> You already have access to this repository.
+</article>
+{{ else if eq .Status "self_access" }}
+<article class="alert error">
+  <strong>Oops.</strong> You cannot update your own permissions.
 </article>
 {{ else if eq .Status "internal_error" }}
 <article class="alert error">

@@ -1,5 +1,7 @@
 package common
 
+import "go.mkw.re/ghidra-panel/ghidra"
+
 type Identity struct {
 	ID         uint64 `json:"id"`
 	Username   string `json:"username"`
@@ -14,8 +16,6 @@ type GhidraEndpoint struct {
 type UserState struct {
 	Username    string
 	HasPassword bool
-	// Legacy Ghidra account username, if any
-	LegacyAccountUsername string
 }
 
 type Link struct {
@@ -25,5 +25,10 @@ type Link struct {
 
 type UserRepoAccessDisplay struct {
 	Repo string
-	Perm string
+	Perm ghidra.Permission
+}
+
+type RepoUserAccessDisplay struct {
+	User string
+	Perm ghidra.Permission
 }

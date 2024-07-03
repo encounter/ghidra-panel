@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+option go_package = "go.mkw.re/ghidra-panel/ghidra";
+option java_multiple_files = true;
+option java_outer_classname = "GhidraProto";
+option java_package = "re.mkw.srejaas.proto";
+
+package ghidra;
+
+import "google/protobuf/empty.proto";
+
+service Ghidra {
+  rpc GetVersion(google.protobuf.Empty) returns (Version) {}
+  rpc GetRepositoriesAndUsers(google.protobuf.Empty) returns (GetRepositoriesAndUsersReply) {}
+  rpc GetRepositories(google.protobuf.Empty) returns (GetRepositoriesReply) {}
+  rpc GetRepositoryUser(GetRepositoryUserRequest) returns (GetRepositoryUserReply) {}
+  rpc GetUsers(google.protobuf.Empty) returns (GetUsersReply) {}
+  rpc AddUser(AddUserRequest) returns (google.protobuf.Empty) {}
+  rpc RemoveUser(RemoveUserRequest) returns (google.protobuf.Empty) {}
+  rpc SetUserPermission(SetUserPermissionRequest) returns (google.protobuf.Empty) {}
+  rpc AuthenticateUser(AuthenticateUserRequest) returns (AuthenticateUserReply) {}
+}
+
+message Version {
+  string ghidraVersion = 1;
+  string ghidraPanelVersion = 2;
+}
+
+message User {
+  string username = 1;
+  bool hasPassword = 2;
+}
+
+enum Permission {
+  READ_ONLY = 0;
+  WRITE = 1;
+  ADMIN = 2;
+  NONE = -2;
+}
+
+message UserWithPermission {
+  User user = 1;
+  Permission permission = 2;
+}
+
+message Repository {
+  string name = 1;
+  string path = 2;
+  bool anonymousAccessAllowed = 3;
+  repeated UserWithPermission users = 4;
+}
+
+message GetRepositoriesAndUsersReply {
+  Version version = 1;
+  string repositoriesDir = 2;
+  repeated Repository repositories = 3;
+  repeated User users = 4;
+}
+
+message GetRepositoriesReply {
+  string repositoriesDir = 1;
+  repeated Repository repositories = 2;
+}
+
+message GetRepositoryUserRequest {
+  string username = 1;
+  string repository = 2;
+}
+
+message GetRepositoryUserReply {
+  UserWithPermission result = 1;
+}
+
+message GetUsersReply {
+  repeated User users = 1;
+}
+
+message AddUserRequest {
+  string username = 1;
+}
+
+message RemoveUserRequest {
+  string username = 1;
+}
+
+message SetUserPermissionRequest {
+  string username = 1;
+  string repository = 2;
+  Permission permission = 3;
+}
+
+message AuthenticateUserRequest {
+  // Username to authenticate (case-insensitive)
+  // Reply will contain the actual username
+  string username = 1;
+  // Password to authenticate
+  string password = 2;
+}
+
+message AuthenticateUserReply {
+  // Whether the authentication was successful
+  bool success = 1;
+  // Attempted username, if empty, no matching user was found
+  string username = 2;
+  // If success is false, this will contain the reason
+  string message = 3;
+}

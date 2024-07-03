@@ -103,14 +103,15 @@ func main() {
 
 	group, ctx := errgroup.WithContext(ctx)
 
-	// Setup ACL monitor
+	// Setup gRPC client
 
-	acls := ghidra.ACLMon{Dir: cfg.Ghidra.RepoDir}
-	if acls.Dir != "" {
-		group.Go(func() error {
-			log.Printf("Monitoring ACLs at %s", acls.Dir)
-			return acls.Run(ctx)
-		})
+	grpcAddr := cfg.Ghidra.GRPCAddr
+	if grpcAddr == "" {
+		grpcAddr = ghidra.DefaultGrpcAddr
+	}
+	client, err := ghidra.Connect(grpcAddr)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Setup web server
@@ -131,13 +132,14 @@ func main() {
 	issuer := token.NewIssuer((*[32]byte)(secrets.HMACSecret))
 
 	webConfig := web.Config{
+		BaseURL:           cfg.BaseURL,
 		GhidraEndpoint:    &cfg.Ghidra.Endpoint,
 		Links:             cfg.Links,
 		DiscordApp:        app,
 		DiscordWebhookURL: cfg.Discord.WebhookURL,
 		Dev:               *dev,
 	}
-	server, err := web.NewServer(&webConfig, db, auth, &issuer, &acls)
+	server, err := web.NewServer(&webConfig, db, auth, &issuer, client)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -145,7 +147,7 @@ func main() {
 	mux := http.NewServeMux()
 	server.RegisterRoutes(mux)
 
-	log.Printf("Listening on %s", *listen)
+	log.Println("Server listening on", *listen)
 
 	httpServer := http.Server{
 		Addr:    *listen,
@@ -163,9 +165,9 @@ func main() {
 	})
 
 	if err := group.Wait(); err != nil {
-		log.Print(err)
+		log.Println(err)
 	}
-	log.Print("Graceful shut down")
+	log.Println("Server stopped gracefully")
 }
 
 func updateAccount(dbPath string, userID uint64, user, pass string) {

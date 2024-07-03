@@ -40,3 +40,47 @@ article.error {
   background-color: #833;
   color: #fff;
 }
+
+.password_row {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.password_row > label {
+  flex-grow: 1;
+}
+
+form {
+  margin-bottom: 0;
+}
+
+form button {
+  width: auto;
+  height: auto;
+}
+
+ul.list {
+  padding: 0;
+}
+
+ul.list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style-type: none;
+  gap: 1rem;
+}
+
+ul.list > li > samp {
+  flex-grow: 1;
+}
+
+button.small {
+  width: auto;
+  padding: 0 0.5rem;
+  margin: 0;
+}

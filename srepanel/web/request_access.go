@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"go.mkw.re/ghidra-panel/common"
@@ -10,14 +9,8 @@ import (
 	"go.mkw.re/ghidra-panel/ghidra"
 	"log"
 	"net/http"
-	"time"
+	"net/url"
 )
-
-var colorForPerm = map[int]int{
-	ghidra.PermRead:  0x22bb33,
-	ghidra.PermWrite: 0x5bc0de,
-	ghidra.PermAdmin: 0xbb2124,
-}
 
 func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
@@ -50,41 +43,55 @@ func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) 
 
 	userState, err := s.DB.GetUserState(req.Context(), ident)
 	if err != nil {
-		log.Println("Failed to get user state: ", err)
-		http.Redirect(wr, req, "/?status=internal_error", http.StatusSeeOther)
+		log.Println("Failed to get user state:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
 
 	// Check if the user already has access to the repository
-	if s.ACLs.Get().QueryUserAccess(userState.Username, repo) >= newPerm {
-		http.Redirect(wr, req, "/?status=request_redundant", http.StatusSeeOther)
+	reply, err := s.Client.GetRepositoryUser(req.Context(), &ghidra.GetRepositoryUserRequest{
+		Username:   userState.Username,
+		Repository: repo,
+	})
+	if err != nil {
+		log.Println("Failed to get repository user:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+	if reply.Result != nil && reply.Result.Permission >= newPerm {
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "request_redundant"}), http.StatusSeeOther)
 		return
 	}
 
-	message := s.writeMessage(ident, userState, repo, newPerm)
+	message, err := s.writeMessage(ident, userState, repo, newPerm)
+	if err != nil {
+		log.Println("Failed to create webhook message:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
 
 	// Send access request message
-	ctx := context.TODO()
-	payloadBuf, _ := json.Marshal(&message)
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, s.Config.DiscordWebhookURL, bytes.NewReader(payloadBuf))
+	payloadBuf, _ := json.Marshal(message)
+	req, err = http.NewRequestWithContext(req.Context(), http.MethodPost, s.Config.DiscordWebhookURL, bytes.NewReader(payloadBuf))
 	if err != nil {
-		http.Redirect(wr, req, "/?status=internal_error", http.StatusSeeOther)
+		log.Println("Failed to create webhook request:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
 
 	req.Header.Set("content-type", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// TODO properly handle
-		http.Redirect(wr, req, "/?status=internal_error", http.StatusSeeOther)
+		log.Println("Failed to send webhook message:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
 	defer res.Body.Close()
 
-	http.Redirect(wr, req, "/?status=request_success", http.StatusSeeOther)
+	http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "request_success"}), http.StatusSeeOther)
 }
 
-func (s *Server) writeMessage(ident *common.Identity, userState *common.UserState, repo string, perm int) discord.WebhookMessage {
+func (s *Server) writeMessage(ident *common.Identity, userState *common.UserState, repo string, perm ghidra.Permission) (*discord.WebhookMessage, error) {
 	embedAuthor := discord.EmbedAuthor{
 		Name:    ident.Username,
 		IconURL: fmt.Sprintf("https://cdn.discordapp.com/avatars/%d/%s.png", ident.ID, ident.AvatarHash),
@@ -104,22 +111,38 @@ func (s *Server) writeMessage(ident *common.Identity, userState *common.UserStat
 
 	roleField := discord.EmbedField{
 		Name:   "Role",
-		Value:  ghidra.PermDisplay[perm],
+		Value:  ghidra.PermDisplay(perm),
 		Inline: true,
+	}
+
+	u, err := url.Parse(s.Config.BaseURL)
+	if err != nil {
+		log.Println("Failed to parse base URL:", err)
+		return nil, err
+	}
+	u = u.JoinPath("repos", url.PathEscape(repo))
+	q := u.Query()
+	q.Set("user", userState.Username)
+	q.Set("role", ghidra.Permission_name[int32(perm)])
+	q.Set("status", "user_prefilled")
+	u.RawQuery = q.Encode()
+	manageField := discord.EmbedField{
+		Name:   "Link",
+		Value:  "[Manage repository users](" + u.String() + ")",
+		Inline: false,
 	}
 
 	ghidraEmbed := discord.Embed{
 		Title:       "Access Request",
 		Description: fmt.Sprintf("<@%d> has requested access to the following repository.", ident.ID),
-		Color:       colorForPerm[perm],
+		Color:       ghidra.PermColor(perm),
 		Author:      embedAuthor,
-		Fields:      []discord.EmbedField{usernameField, repositoryField, roleField},
-		Timestamp:   time.Now().Format(time.RFC3339),
+		Fields:      []discord.EmbedField{usernameField, repositoryField, roleField, manageField},
 	}
 
-	return discord.WebhookMessage{
+	return &discord.WebhookMessage{
 		Username:  s.Config.DiscordApp.Name,
 		AvatarURL: fmt.Sprintf("https://cdn.discordapp.com/app-icons/%s/%s.png", s.Config.DiscordApp.ID, s.Config.DiscordApp.Icon),
 		Embeds:    []discord.Embed{ghidraEmbed},
-	}
+	}, nil
 }

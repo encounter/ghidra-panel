@@ -3,25 +3,6 @@
 <head>
   <title>Ghidra Panel - Home</title>
   {{ template "head.gohtml" }}
-  <style>
-    .password_row {
-      width: 100%;
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .password_row > label {
-      flex-grow: 1;
-    }
-
-    form button {
-      width: auto;
-      height: auto;
-    }
-  </style>
 </head>
 <body>
 {{ template "nav.gohtml" . }}
@@ -34,9 +15,16 @@
       <strong>Repository Access</strong>
     </header>
     {{ if .ACL | len  }}
-    <ul>
+    <ul class="list">
       {{ range $repo := .ACL }}
-      <li>{{ $repo.Repo }}: {{ $repo.Perm }}</li>
+      <li>
+        {{ if eq .Perm 2 }}
+        <a href="/repos/{{ .Repo }}"><samp>{{ .Repo }}</samp></a>
+        {{ else }}
+        <samp>{{ .Repo }}</samp>
+        {{ end }}
+        <span style="color: {{ permColor .Perm }}">{{ permDisplay .Perm }}</span>
+      </li>
       {{ end }}
     </ul>
     {{ else }}
@@ -73,8 +61,8 @@
       <p>If you have an existing account, enter the credentials here.</p>
 
       <label for="create-username">Username</label>
-      {{ if ne .UserState.LegacyAccountUsername "" }}
-      <input id="create-username" type="text" name="username" value="{{ .UserState.LegacyAccountUsername }}" disabled>
+      {{ if ne .LegacyAccountUsername "" }}
+      <input id="create-username" type="text" name="username" value="{{ .LegacyAccountUsername }}" disabled>
       <small>An existing Ghidra account with this username was found.</small>
       {{ else }}
       <input id="create-username" type="text" name="username" value="{{ .UserState.Username }}" required>
@@ -86,7 +74,7 @@
       <small>Please do not share your password with anyone else.</small>
 
       <div class="grid">
-        {{ if ne .UserState.LegacyAccountUsername "" }}
+        {{ if ne .LegacyAccountUsername "" }}
         <button role="button" type="submit">Link</button>
         {{ else }}
         <button role="button" type="submit">Create</button>
@@ -108,6 +96,7 @@
           <input id="port" type="text" value="{{ .Ghidra.Port }}" disabled>
         </label>
       </div>
+      <small>Server version: {{ .GhidraVersion }}</small>
 
       <label for="update-username">Username</label>
       <input id="update-username" type="text" name="username" value="{{ .UserState.Username }}" disabled>

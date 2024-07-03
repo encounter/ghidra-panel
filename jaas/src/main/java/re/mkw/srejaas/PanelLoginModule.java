@@ -1,24 +1,23 @@
 package re.mkw.srejaas;
 
 import com.sun.security.auth.UserPrincipal;
+import ghidra.server.UserManager;
+import ghidra.server.remote.GhidraServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator;
 import org.bouncycastle.crypto.params.Argon2Parameters;
-import org.bouncycastle.util.encoders.Hex;
+import re.mkw.srejaas.reflect.GhidraServerSupport;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.login.FailedLoginException;
 import javax.security.auth.login.LoginException;
 import javax.security.auth.spi.LoginModule;
-import java.io.File;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 
@@ -31,20 +30,18 @@ import java.util.*;
  * <p>For further information see <a href="https://github.com/mkw-re/ghidra-panel">Ghidra Panel
  * repo</a>.
  */
+@SuppressWarnings("unused")
 public class PanelLoginModule implements LoginModule {
-
-  private static final String USER_PROMPT_OPTION_NAME = "USER_PROMPT";
-  private static final String PASSWORD_PROMPT_OPTION_NAME = "PASSWORD_PROMPT";
   private static final String JDBC_OPTION_NAME = "JDBC";
-  private static final String REPO_DIR_OPTION_NAME = "REPO_DIR";
 
   private Logger log;
   private Subject subject;
   private CallbackHandler callbackHandler;
   private Map<String, Object> options;
+  private UserManager userManager;
   private UserPrincipal user;
   private String username;
-  private byte[] password;
+  private char[] password;
 
   private boolean pwGhidra;
   private byte[] pwSalt;
@@ -62,6 +59,9 @@ public class PanelLoginModule implements LoginModule {
     this.subject = subject;
     this.callbackHandler = callbackHandler;
     this.options = (Map<String, Object>) options;
+
+    GhidraServer ghidraServer = GhidraServerSupport.getGhidraServer();
+    this.userManager = GhidraServerSupport.getRepositoryManager(ghidraServer).getUserManager();
   }
 
   @Override
@@ -121,7 +121,7 @@ public class PanelLoginModule implements LoginModule {
     user = null;
     username = null;
     if (password != null) {
-      Arrays.fill(password, (byte) 0);
+      Arrays.fill(password, '\0');
       password = null;
     }
   }
@@ -146,19 +146,16 @@ public class PanelLoginModule implements LoginModule {
    * @throws LoginException Failed to retrieve username/password
    */
   private void getNameAndPassword() throws LoginException {
-    String userPrompt = options.getOrDefault(USER_PROMPT_OPTION_NAME, "Username").toString();
-    String passPrompt = options.getOrDefault(PASSWORD_PROMPT_OPTION_NAME, "Password").toString();
-
     List<Callback> callbacks = new ArrayList<>();
     NameCallback ncb = null;
     PasswordCallback pcb = null;
 
     if (username == null) {
-      ncb = new NameCallback(userPrompt);
+      ncb = new NameCallback("Username");
       callbacks.add(ncb);
     }
     if (password == null) {
-      pcb = new PasswordCallback(passPrompt, false);
+      pcb = new PasswordCallback("Password", false);
       callbacks.add(pcb);
     }
 
@@ -169,15 +166,8 @@ public class PanelLoginModule implements LoginModule {
           username = ncb.getName();
         }
         if (pcb != null) {
-          char[] tmpPassword = pcb.getPassword();
-          if (tmpPassword != null) {
-            ByteBuffer byteBuffer = StandardCharsets.UTF_8.encode(CharBuffer.wrap(tmpPassword));
-            password = new byte[byteBuffer.remaining()];
-            byteBuffer.get(password);
-            Arrays.fill(byteBuffer.array(), (byte) 0);
-            Arrays.fill(tmpPassword, '\0');
-            pcb.clearPassword();
-          }
+          password = pcb.getPassword();
+          pcb.clearPassword();
         }
 
         if (username == null || password == null) {
@@ -204,7 +194,7 @@ public class PanelLoginModule implements LoginModule {
     if (username.contains("\n") || username.contains("\0")) {
       throw new LoginException("Bad characters in username");
     }
-    for (byte b : password) {
+    for (char b : password) {
       if (b == '\n' || b == '\0') {
         throw new LoginException("Bad characters in password");
       }
@@ -230,8 +220,8 @@ public class PanelLoginModule implements LoginModule {
 
       rs = stmt.executeQuery();
       if (!rs.next()) {
-        // Try to fetch unmigrated password from Ghidra's user file
-        if (getPasswordHashGhidra()) {
+        // Fall back to Ghidra's internal user management
+        if (userManager.isValidUser(this.username)) {
           this.pwGhidra = true;
           return;
         }
@@ -266,54 +256,6 @@ public class PanelLoginModule implements LoginModule {
   }
 
   /**
-   * Retrieves the password hash and salt from Ghidra's user file.
-   *
-   * @return whether a password hash was found
-   */
-  private boolean getPasswordHashGhidra() {
-    String repoDir = options.getOrDefault(REPO_DIR_OPTION_NAME, "").toString();
-    if (repoDir.isEmpty()) {
-      log.warn("REPO_DIR not provided, not falling back to Ghidra authentication");
-      return false;
-    }
-
-    File userFile = new File(repoDir + "/users");
-    if (!userFile.exists()) {
-      log.warn("Ghidra users file doesn't exist");
-      return false;
-    }
-
-    try {
-      Scanner scanner = new Scanner(userFile);
-      while (scanner.hasNextLine()) {
-        String line = scanner.nextLine();
-        if (line.startsWith(";")) {
-          continue;
-        }
-        String[] parts = line.split(":");
-        if (parts.length < 2) {
-          continue;
-        }
-        if (parts[0].equals(this.username)) {
-          byte[] hashString = parts[1].getBytes(StandardCharsets.US_ASCII);
-          if (hashString.length != 4 + 32 * 2 /* base16 salt + SHA-256 hash */) {
-            return false;
-          }
-          this.pwSalt = new byte[4];
-          byte[] hashBytes = new byte[64];
-          System.arraycopy(hashString, 0, this.pwSalt, 0, 4);
-          System.arraycopy(hashString, 4, hashBytes, 0, 64);
-          this.pwHash = Hex.decode(hashBytes);
-          return true;
-        }
-      }
-    } catch (Exception e) {
-      log.error("Failed to read Ghidra users file", e);
-    }
-    return false;
-  }
-
-  /**
    * Hash password provided by client.
    *
    * @return Argon2id hash of password.
@@ -336,31 +278,24 @@ public class PanelLoginModule implements LoginModule {
   }
 
   /**
-   * Hash password provided by the client using salted SHA-256. (Ghidra method)
-   *
-   * @return SHA-256 hash of password.
-   */
-  private byte[] hashGivenPasswordGhidra() {
-    SHA256Digest digest = new SHA256Digest();
-    digest.update(this.pwSalt, 0, this.pwSalt.length);
-    digest.update(this.password, 0, this.password.length);
-    byte[] actualHash = new byte[digest.getDigestSize()];
-    digest.doFinal(actualHash, 0);
-    return actualHash;
-  }
-
-  /**
    * Verifies that given password matches hash.
    *
    * @throws LoginException Wrong password
    */
   private void verifyPassword() throws LoginException {
-    byte[] actualHash;
     if (pwGhidra) {
-      actualHash = hashGivenPasswordGhidra();
-    } else {
-      actualHash = hashGivenPassword();
+      try {
+        userManager.authenticateUser(username, password);
+      } catch (FailedLoginException e) {
+        throw new LoginException("Authentication failed");
+      } catch (IOException e) {
+        log.error("Ghidra authentication failed", e);
+        throw new LoginException("Internal error");
+      }
+      return;
     }
+
+    byte[] actualHash = hashGivenPassword();
     /* Constant-time compare */
     boolean correct = org.bouncycastle.util.Arrays.constantTimeAreEqual(this.pwHash, actualHash);
     if (!correct) {

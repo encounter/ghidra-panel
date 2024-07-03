@@ -4,7 +4,7 @@ package discord
 // Application API //
 // --------------- //
 
-// https://discord.com/developers/docs/resources/application#application-object
+// Application https://discord.com/developers/docs/resources/application#application-object
 type Application struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -15,20 +15,20 @@ type Application struct {
 // Channel API //
 // ----------- //
 
-// https://discord.com/developers/docs/resources/channel#embed-object-embed-author-structure
+// EmbedAuthor https://discord.com/developers/docs/resources/channel#embed-object-embed-author-structure
 type EmbedAuthor struct {
 	Name    string `json:"name"`
 	IconURL string `json:"icon_url"`
 }
 
-// https://discord.com/developers/docs/resources/channel#embed-object-embed-field-structure
+// EmbedField https://discord.com/developers/docs/resources/channel#embed-object-embed-field-structure
 type EmbedField struct {
 	Name   string `json:"name"`
 	Value  string `json:"value"`
 	Inline bool   `json:"inline"`
 }
 
-// https://discord.com/developers/docs/resources/channel#embed-object
+// Embed https://discord.com/developers/docs/resources/channel#embed-object
 type Embed struct {
 	Title       string       `json:"title"`
 	Description string       `json:"description"`
@@ -42,7 +42,7 @@ type Embed struct {
 // Webhook API //
 // ----------- //
 
-// https://discord.com/developers/docs/resources/webhook#execute-webhook
+// WebhookMessage https://discord.com/developers/docs/resources/webhook#execute-webhook
 type WebhookMessage struct {
 	Username  string  `json:"username"`
 	AvatarURL string  `json:"avatar_url"`

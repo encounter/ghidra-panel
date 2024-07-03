@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Ghidra Panel - Error</title>
+    {{ template "head.gohtml" }}
+</head>
+<body>
+{{ template "nav.gohtml" . }}
+<main class="container">
+    <h1>Error</h1>
+    <article class="alert error">{{ .Message }} Please contact server admin.</article>
+</main>
+{{ template "footer.gohtml" . }}
+</body>
+</html>

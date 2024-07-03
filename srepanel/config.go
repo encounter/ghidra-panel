@@ -18,13 +18,12 @@ type config struct {
 	} `json:"discord"`
 	Ghidra struct {
 		Endpoint common.GhidraEndpoint `json:"endpoint"`
-		RepoDir  string                `json:"repo_dir"`
+		GRPCAddr string                `json:"grpc_addr"`
 	} `json:"ghidra"`
 	Links []common.Link `json:"links"`
 }
 
 func (c *config) validate() {
-
 	if c.Discord.ClientID == "" {
 		log.Fatal("client_id not set")
 	}

@@ -3,8 +3,9 @@ package web
 import (
 	"embed"
 	"html/template"
+	"log"
 	"net/http"
-	"sort"
+	"net/url"
 	"unicode"
 	"unicode/utf8"
 
@@ -26,18 +27,28 @@ var (
 var (
 	homePage  *template.Template
 	loginPage *template.Template
+	repoPage  *template.Template
+	errorPage *template.Template
 )
 
 func init() {
-	templates, err := template.ParseFS(templates, "templates/*.gohtml")
+	templates, err := template.New("").
+		Funcs(template.FuncMap{
+			"permColor":   ghidra.PermColorHex,
+			"permDisplay": ghidra.PermDisplay,
+		}).
+		ParseFS(templates, "templates/*.gohtml")
 	if err != nil {
 		panic(err)
 	}
 	homePage = templates.Lookup("home.gohtml")
 	loginPage = templates.Lookup("login.gohtml")
+	repoPage = templates.Lookup("repo.gohtml")
+	errorPage = templates.Lookup("error.gohtml")
 }
 
 type Config struct {
+	BaseURL           string
 	GhidraEndpoint    *common.GhidraEndpoint
 	Links             []common.Link
 	DiscordApp        *discord.Application
@@ -50,7 +61,7 @@ type Server struct {
 	DB     *database.DB
 	Auth   *discord.Auth
 	Issuer *token.Issuer
-	ACLs   *ghidra.ACLMon
+	Client ghidra.GhidraClient
 }
 
 func NewServer(
@@ -58,30 +69,33 @@ func NewServer(
 	db *database.DB,
 	auth *discord.Auth,
 	issuer *token.Issuer,
-	acls *ghidra.ACLMon,
+	client ghidra.GhidraClient,
 ) (*Server, error) {
 	server := &Server{
 		Config: config,
 		DB:     db,
 		Auth:   auth,
 		Issuer: issuer,
-		ACLs:   acls,
+		Client: client,
 	}
 	return server, nil
 }
 
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/", s.handleHome)
-	mux.HandleFunc("/login", s.handleLogin)
-	mux.HandleFunc("/redirect", s.handleOAuthRedirect)
-	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("GET /", s.handleHome)
+	mux.HandleFunc("GET /login", s.handleLogin)
+	mux.HandleFunc("POST /login", s.handleLogin)
+	mux.HandleFunc("GET /redirect", s.handleOAuthRedirect)
+	mux.HandleFunc("GET /logout", s.handleLogout)
+	mux.HandleFunc("GET /repos/{repo}", s.handleRepo)
 
-	mux.HandleFunc("/create_account", s.handleCreateAccount)
-	mux.HandleFunc("/update_account", s.handleUpdateAccount)
-	mux.HandleFunc("/request_access", s.handleRequestAccess)
+	mux.HandleFunc("POST /create_account", s.handleCreateAccount)
+	mux.HandleFunc("POST /update_account", s.handleUpdateAccount)
+	mux.HandleFunc("POST /request_access", s.handleRequestAccess)
+	mux.HandleFunc("POST /set_user_access", s.handleSetUserAccess)
 
 	// Create file server for assets
-	mux.Handle("/assets/", http.FileServer(http.FS(assets)))
+	mux.Handle("GET /assets/", http.FileServer(http.FS(assets)))
 }
 
 // State holds server-side web page state.
@@ -91,8 +105,6 @@ type State struct {
 	Nav       []Nav         // navigation bar
 	Links     []common.Link // footer links
 	Ghidra    *common.GhidraEndpoint
-	ACL       []common.UserRepoAccessDisplay
-	Repos     []string
 	Status    string
 }
 
@@ -119,7 +131,7 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 			Path:   "/",
 			MaxAge: -1,
 		})
-		http.Redirect(wr, req, "/login", http.StatusTemporaryRedirect)
+		http.Redirect(wr, req, "/login", http.StatusUnauthorized)
 		return false
 	}
 
@@ -127,31 +139,11 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 
 	userState, err := s.DB.GetUserState(req.Context(), ident)
 	if err != nil {
-		http.Error(wr, "failed to get user state, please contact server admin", http.StatusInternalServerError)
+		log.Println("Failed to get user state:", err)
+		s.renderError(wr, http.StatusInternalServerError, "Failed to get user state.", state)
 		return false
 	}
 	state.UserState = userState
-
-	// Check if there's a matching legacy Ghidra account
-	if !state.UserState.HasPassword {
-		u, _ := s.ACLs.Get().QueryLegacyUser(state.UserState.Username)
-		state.UserState.LegacyAccountUsername = u
-	}
-
-	// Query for repository access
-	acl := s.ACLs.Get().QueryUser(state.UserState.Username)
-	state.ACL = make([]common.UserRepoAccessDisplay, len(acl))
-	for i, v := range acl {
-		state.ACL[i] = common.UserRepoAccessDisplay{
-			Repo: v.Repo,
-			Perm: ghidra.PermDisplay[v.Perm],
-		}
-	}
-	sort.Slice(state.ACL, func(i, j int) bool { return lessCaseInsensitive(state.ACL[i].Repo, state.ACL[j].Repo) })
-
-	// Query for repository list
-	state.Repos = s.ACLs.Get().QueryRepos()
-	sort.Slice(state.Repos, func(i, j int) bool { return lessCaseInsensitive(state.Repos[i], state.Repos[j]) })
 
 	return true
 }
@@ -181,4 +173,22 @@ func lessCaseInsensitive(s, t string) bool {
 		s = s[sizec:]
 		t = t[sized:]
 	}
+}
+
+// redirectUrl Generates a redirect back to the original resource with added query parameters.
+func redirectUrl(req *http.Request, params map[string]string) string {
+	out := req.Header.Get("Referer")
+	if out == "" {
+		out = "/"
+	}
+	u, err := url.Parse(out)
+	if err != nil {
+		u, _ = url.Parse("/")
+	}
+	var q = url.Values{}
+	for k, v := range params {
+		q.Set(k, v)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
 }

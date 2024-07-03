@@ -1,9 +1,9 @@
-MAVEN?=mvn
+GRADLE?=gradle
 SQLITE?=sqlite3
 
 .PHONY: build
 build:
-	$(MAVEN) package
+	$(GRADLE) jar
 
 ../test.db:
 	$(MAKE) -C .. test.db
@@ -17,5 +17,5 @@ integration: ../test.db
 
 .PHONY: clean
 clean:
-	#$(MAVEN) clean
+	#$(GRADLE) clean
 	rm -rf target

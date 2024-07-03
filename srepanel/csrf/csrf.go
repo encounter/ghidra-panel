@@ -14,7 +14,7 @@ import (
 	"go.mkw.re/ghidra-panel/bitring"
 )
 
-const csrfValidity = 30 * time.Second
+const csrfValidity = 5 * time.Minute
 
 const csrfDepth = 65536
 

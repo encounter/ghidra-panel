@@ -2,7 +2,5 @@
 auth {
     re.mkw.srejaas.PanelLoginModule REQUIRED
         JDBC="jdbc:sqlite:/path/to/ghidra_panel.db"
-        // For authenticating unmigrated Ghidra users
-        REPO_DIR="/path/to/ghidra/repositories"
     ;
 };
