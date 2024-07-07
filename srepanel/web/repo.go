@@ -11,7 +11,7 @@ import (
 
 type RepoState struct {
 	*State
-	RepoName   string
+	Repo       *common.Repository
 	ACL        []common.RepoUserAccessDisplay
 	Users      []string
 	StatusUser string
@@ -27,7 +27,6 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 			Nav{Route: "/", Name: "Ghidra"},
 			Nav{Route: "/repos/" + repoName, Name: repoName},
 		),
-		RepoName:   repoName,
 		StatusUser: req.URL.Query().Get("statusUser"),
 		QueryUser:  req.URL.Query().Get("user"),
 		QueryRole:  req.URL.Query().Get("role"),
@@ -35,6 +34,15 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	if !s.authenticateState(wr, req, state.State) {
 		return
 	}
+
+	// Fetch repository information from the database
+	info, err := s.DB.GetRepository(req.Context(), repoName)
+	if err != nil {
+		log.Println("Failed to fetch repository:", err)
+		s.renderError(wr, http.StatusInternalServerError, "Failed to fetch repository.", state.State)
+		return
+	}
+	state.Repo = info
 
 	// Fetch repository and user information from Ghidra
 	reply, err := s.Client.GetRepositoriesAndUsers(req.Context(), &emptypb.Empty{})

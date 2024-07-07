@@ -32,3 +32,8 @@ type RepoUserAccessDisplay struct {
 	User string
 	Perm ghidra.Permission
 }
+
+type Repository struct {
+	Name       string
+	WebhookURL string
+}

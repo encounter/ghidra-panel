@@ -93,6 +93,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /update_account", s.handleUpdateAccount)
 	mux.HandleFunc("POST /request_access", s.handleRequestAccess)
 	mux.HandleFunc("POST /set_user_access", s.handleSetUserAccess)
+	mux.HandleFunc("POST /update_repo", s.handleUpdateRepo)
 
 	// Create file server for assets
 	mux.Handle("GET /assets/", http.FileServer(http.FS(assets)))
@@ -131,7 +132,7 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 			Path:   "/",
 			MaxAge: -1,
 		})
-		http.Redirect(wr, req, "/login", http.StatusUnauthorized)
+		http.Redirect(wr, req, "/login", http.StatusSeeOther)
 		return false
 	}
 

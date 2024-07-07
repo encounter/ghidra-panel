@@ -6,29 +6,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	_ "github.com/mattn/go-sqlite3"
-	"golang.org/x/crypto/argon2"
-
 	"go.mkw.re/ghidra-panel/common"
+	"golang.org/x/crypto/argon2"
 )
-
-type DB struct {
-	*sql.DB
-}
-
-func Open(filePath string) (*DB, error) {
-	db, err := sql.Open("sqlite3", filePath+"?_journal_mode=WAL")
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := db.Exec(migrations); err != nil {
-		return nil, fmt.Errorf("migrations failed: %w", err)
-	}
-
-	return &DB{db}, nil
-}
 
 func (d *DB) GetUserState(ctx context.Context, ident *common.Identity) (*common.UserState, error) {
 	hasPass := true

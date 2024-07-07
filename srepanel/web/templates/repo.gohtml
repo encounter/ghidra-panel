@@ -7,7 +7,7 @@
 <body>
 {{ template "nav.gohtml" . }}
 <main class="container">
-    <h1>{{ .RepoName }}</h1>
+    <h1>{{ .Repo.Name }}</h1>
     {{ template "status.gohtml" . }}
     <div class="grid">
         <article>
@@ -21,7 +21,7 @@
                 <samp>{{ .User }}</samp>
                 <span style="color: {{ permColor .Perm }}">{{ permDisplay .Perm }}</span>
                 <form action="/set_user_access" method="post">
-                    <input type="hidden" name="repo" value="{{ $.RepoName }}">
+                    <input type="hidden" name="repo" value="{{ $.Repo.Name }}">
                     <input type="hidden" name="user" value="{{ .User }}">
                     <input type="hidden" name="role" value="NONE">
                     <button class="small outline secondary"><i class="fa-solid fa-xmark"></i></button>
@@ -33,12 +33,13 @@
             <p>No users added to repository.</p>
             {{ end }}
         </article>
+        <div>
         <article>
             <header>
                 <strong>Add User</strong>
             </header>
             <form action="/set_user_access" method="post">
-                <input type="hidden" name="repo" value="{{ .RepoName }}">
+                <input type="hidden" name="repo" value="{{ .Repo.Name }}">
                 <label for="user">Users</label>
                 <select id="user" name="user" required>
                     <option value="" disabled selected>Select a user...</option>
@@ -74,6 +75,22 @@
                 </div>
             </form>
         </article>
+        <article>
+            <header>
+                <strong>Settings</strong>
+            </header>
+            <form action="/update_repo" method="post">
+                <input type="hidden" name="repo" value="{{ .Repo.Name }}">
+                <label for="webhook_url">Discord Webhook URL</label>
+                {{ if .Repo.WebhookURL }}
+                <input type="text" id="webhook_url" name="webhook_url" placeholder="Type DELETE to remove">
+                {{ else }}
+                <input type="text" id="webhook_url" name="webhook_url" placeholder="Not configured">
+                {{ end }}
+                <button role="button" type="submit" class="outline">Update</button>
+            </form>
+        </article>
+        </div>
     </div>
 </main>
 {{ template "footer.gohtml" . }}

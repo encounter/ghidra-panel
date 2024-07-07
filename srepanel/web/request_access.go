@@ -70,9 +70,22 @@ func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// Fetch repository information from the database
+	info, err := s.DB.GetRepository(req.Context(), repo)
+	if err != nil {
+		log.Println("Failed to fetch repository:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+
 	// Send access request message
+	webhookUrl := info.WebhookURL
+	if webhookUrl == "" {
+		// Fallback to the global webhook URL
+		webhookUrl = s.Config.DiscordWebhookURL
+	}
 	payloadBuf, _ := json.Marshal(message)
-	req, err = http.NewRequestWithContext(req.Context(), http.MethodPost, s.Config.DiscordWebhookURL, bytes.NewReader(payloadBuf))
+	req, err = http.NewRequestWithContext(req.Context(), http.MethodPost, webhookUrl, bytes.NewReader(payloadBuf))
 	if err != nil {
 		log.Println("Failed to create webhook request:", err)
 		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)

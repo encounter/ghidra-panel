@@ -22,6 +22,10 @@
 <article class="alert success">
   Click "Add" to accept the access request.
 </article>
+{{ else if eq .Status "update_repo_success" }}
+<article class="alert success">
+  <strong>Success!</strong> Repository settings updated.
+</article>
 {{ else if eq .Status "username_exists" }}
 <article class="alert error">
   <strong>Oops.</strong> The username you entered already exists.
@@ -41,6 +45,10 @@
 {{ else if eq .Status "self_access" }}
 <article class="alert error">
   <strong>Oops.</strong> You cannot update your own permissions.
+</article>
+{{ else if eq .Status "bad_webhook_url" }}
+<article class="alert error">
+  <strong>Oops.</strong> The entered webhook URL is invalid.
 </article>
 {{ else if eq .Status "internal_error" }}
 <article class="alert error">

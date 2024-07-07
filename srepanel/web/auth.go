@@ -10,7 +10,7 @@ import (
 func (s *Server) handleLogin(wr http.ResponseWriter, req *http.Request) {
 	_, ok := s.checkAuth(req)
 	if ok {
-		http.Redirect(wr, req, "/", http.StatusTemporaryRedirect)
+		http.Redirect(wr, req, "/", http.StatusSeeOther)
 		return
 	}
 
@@ -38,13 +38,13 @@ func (s *Server) handleLogin(wr http.ResponseWriter, req *http.Request) {
 				HttpOnly: true,
 				Secure:   true,
 			})
-			http.Redirect(wr, req, "/", http.StatusTemporaryRedirect)
+			http.Redirect(wr, req, "/", http.StatusSeeOther)
 			return
 		}
 		authURL := s.Auth.AuthURL()
-		http.Redirect(wr, req, authURL, http.StatusTemporaryRedirect)
+		http.Redirect(wr, req, authURL, http.StatusSeeOther)
 	default:
-		http.Error(wr, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(wr, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -66,7 +66,7 @@ func (s *Server) handleOAuthRedirect(wr http.ResponseWriter, req *http.Request) 
 		HttpOnly: true,
 		Secure:   true,
 	})
-	http.Redirect(wr, req, "/", http.StatusTemporaryRedirect)
+	http.Redirect(wr, req, "/", http.StatusSeeOther)
 }
 
 func (s *Server) checkAuth(req *http.Request) (*common.Identity, bool) {
@@ -85,5 +85,5 @@ func (s *Server) handleLogout(wr http.ResponseWriter, req *http.Request) {
 		MaxAge: -1,
 	})
 
-	http.Redirect(wr, req, "/login", http.StatusTemporaryRedirect)
+	http.Redirect(wr, req, "/login", http.StatusSeeOther)
 }
