@@ -32,9 +32,17 @@ func (s *Server) handleUpdateRepo(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Fetch user state from the database
+	userState, err := s.DB.GetUserState(req.Context(), ident)
+	if err != nil {
+		log.Println("Failed to get user state:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+
 	// Verify the user has admin access to the repository
 	repoUser, err := s.Client.GetRepositoryUser(req.Context(), &ghidra.GetRepositoryUserRequest{
-		Username:   ident.Username,
+		Username:   userState.Username,
 		Repository: repo,
 	})
 	if err != nil {
