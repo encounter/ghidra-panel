@@ -3,7 +3,7 @@ package ghidra
 import (
 	"fmt"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/local"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
 )
 
@@ -11,7 +11,7 @@ var DefaultGrpcAddr = "127.0.0.1:13103"
 
 func Connect(addr string) (GhidraClient, error) {
 	log.Println("Using gRPC address", addr)
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(local.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
