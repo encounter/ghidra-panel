@@ -1,117 +1,77 @@
 package token
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
-	"encoding/json"
-	"strings"
+	"fmt"
+	"log"
+	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"go.mkw.re/ghidra-panel/common"
 )
 
 // TODO Integrate BitRing for token expiry
 
-// jwtPrefix is the JWT header of type HS256
-const jwtPrefix = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-
 const jwtValidity = 90 * 24 * time.Hour
 
 type Issuer struct {
-	Secret *[32]byte
+	Secret []byte
 }
 
-func NewIssuer(secret *[32]byte) Issuer {
+func NewIssuer(secret []byte) Issuer {
 	return Issuer{secret}
 }
 
 type Claims struct {
-	Sub        uint64 `json:"sub,string"`
-	Name       string `json:"name"`
-	AvatarHash string `json:"avatar"`
-	Iat        int64  `json:"iat"`
+	jwt.RegisteredClaims
+	Name       string `json:"name,omitempty"`
+	AvatarHash string `json:"avatar,omitempty"`
 }
 
-func (c *Claims) String() string {
-	buf, err := json.Marshal(c)
-	if err != nil {
-		panic("json marshal failed: " + err.Error())
-	}
-	return base64.RawURLEncoding.EncodeToString(buf)
-}
+func (iss Issuer) Issue(ident *common.Identity) (string, time.Time) {
+	iat := time.Now()
+	exp := iat.Add(jwtValidity)
 
-func (iss Issuer) Issue(ident *common.Identity) string {
-	claims := &Claims{
-		Sub:        ident.ID,
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   strconv.FormatUint(ident.ID, 10),
+			IssuedAt:  jwt.NewNumericDate(iat),
+			ExpiresAt: jwt.NewNumericDate(exp),
+		},
 		Name:       ident.Username,
 		AvatarHash: ident.AvatarHash,
-		Iat:        time.Now().Unix(),
+	})
+
+	tokenString, err := token.SignedString(iss.Secret)
+	if err != nil {
+		log.Panicf("jwt signing failed: %v", err)
 	}
-	body := jwtPrefix + claims.String()
-	return body + "." + iss.sign(body)
+	return tokenString, exp
 }
 
-func (iss Issuer) sign(payload string) string {
-	var sig [32]byte
-	mac := hmac.New(sha256.New, iss.Secret[:])
-	_, _ = mac.Write([]byte(payload))
-	mac.Sum(sig[:0])
-
-	return base64.RawURLEncoding.EncodeToString(sig[:])
-}
-
-func (iss Issuer) Verify(jwt string) (ident *common.Identity, ok bool) {
-	// Laziness
-	if !strings.HasPrefix(jwt, jwtPrefix) {
-		return nil, false
-	}
-
-	// Find signature
-	sigSep := strings.LastIndex(jwt, ".")
-	if sigSep == -1 {
-		return nil, false
-	}
-	sigB64 := jwt[sigSep+1:]
-
-	// Decode signature
-	var sig [32]byte
-	_, err := base64.RawURLEncoding.Decode(sig[:], []byte(sigB64))
+func (iss Issuer) Verify(tokenString string) (ident *common.Identity, err error) {
+	// Parse and validate token
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return iss.Secret, nil
+	})
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
 
-	// Verify signature
-	var sig2 [32]byte
-	mac := hmac.New(sha256.New, iss.Secret[:])
-	_, _ = mac.Write([]byte(jwt[:sigSep]))
-	mac.Sum(sig2[:0])
-	macValid := subtle.ConstantTimeCompare(sig[:], sig2[:]) == 1
-	if !macValid {
-		return nil, false
-	}
-
-	// Decode claims
-	claimsB64 := jwt[len(jwtPrefix):sigSep]
-	claimsBuf, err := base64.RawURLEncoding.DecodeString(claimsB64)
+	// Parse claims
+	claims := token.Claims.(*Claims)
+	id, err := strconv.ParseUint(claims.Subject, 10, 64)
 	if err != nil {
-		return nil, false
-	}
-	var claims Claims
-	if err = json.Unmarshal(claimsBuf, &claims); err != nil {
-		return nil, false
-	}
-
-	// Check expiry
-	if time.Now().Unix()-claims.Iat > int64(jwtValidity)/int64(time.Second) {
-		return nil, false
+		return nil, fmt.Errorf("failed to parse subject: %v", err)
 	}
 
 	// Reconstruct identity
 	return &common.Identity{
-		ID:         claims.Sub,
+		ID:         id,
 		Username:   claims.Name,
 		AvatarHash: claims.AvatarHash,
-	}, true
+	}, nil
 }

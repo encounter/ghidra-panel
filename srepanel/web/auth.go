@@ -31,10 +31,12 @@ func (s *Server) handleLogin(wr http.ResponseWriter, req *http.Request) {
 				ID:       1,
 				Username: "testuser",
 			}
+			token, exp := s.Issuer.Issue(ident)
 			http.SetCookie(wr, &http.Cookie{
 				Name:     "token",
-				Value:    s.Issuer.Issue(ident),
+				Value:    token,
 				Path:     "/",
+				Expires:  exp,
 				HttpOnly: true,
 				Secure:   true,
 			})
@@ -59,10 +61,12 @@ func (s *Server) handleOAuthRedirect(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	token, exp := s.Issuer.Issue(ident)
 	http.SetCookie(wr, &http.Cookie{
 		Name:     "token",
-		Value:    s.Issuer.Issue(ident),
+		Value:    token,
 		Path:     "/",
+		Expires:  exp,
 		HttpOnly: true,
 		Secure:   true,
 	})
@@ -74,7 +78,15 @@ func (s *Server) checkAuth(req *http.Request) (*common.Identity, bool) {
 	if err != nil || cookie == nil {
 		return nil, false
 	}
-	return s.Issuer.Verify(cookie.Value)
+	ident, err := s.Issuer.Verify(cookie.Value)
+	if err != nil {
+		// Only log errors in development mode
+		if s.Config.Dev {
+			log.Print("failed to verify token: ", err)
+		}
+		return nil, false
+	}
+	return ident, true
 }
 
 func (s *Server) handleLogout(wr http.ResponseWriter, req *http.Request) {

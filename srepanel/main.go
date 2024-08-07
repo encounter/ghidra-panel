@@ -129,7 +129,7 @@ func main() {
 
 	auth := discord.NewAuth(cfg.Discord.ClientID, cfg.Discord.ClientSecret, redirectURL)
 
-	issuer := token.NewIssuer((*[32]byte)(secrets.HMACSecret))
+	issuer := token.NewIssuer(secrets.HMACSecret)
 
 	webConfig := web.Config{
 		BaseURL:           cfg.BaseURL,
