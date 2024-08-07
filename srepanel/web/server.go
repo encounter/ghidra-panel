@@ -130,9 +130,9 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 			Name:   "token",
 			Value:  "",
 			Path:   "/",
-			MaxAge: -1,
+			MaxAge: 0,
 		})
-		http.Redirect(wr, req, "/login", http.StatusSeeOther)
+		s.redirectLogin(wr, req, true)
 		return false
 	}
 
