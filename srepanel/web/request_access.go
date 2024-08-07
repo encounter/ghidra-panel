@@ -41,29 +41,20 @@ func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	userState, err := s.DB.GetUserState(req.Context(), ident)
-	if err != nil {
-		log.Println("Failed to get user state:", err)
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
-		return
-	}
-
 	// Check if the user already has access to the repository
-	reply, err := s.Client.GetRepositoryUser(req.Context(), &ghidra.GetRepositoryUserRequest{
-		Username:   userState.Username,
-		Repository: repo,
-	})
+	result, err := s.fetchUserPermission(req, ident, repo)
 	if err != nil {
 		log.Println("Failed to get repository user:", err)
 		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
-	if reply.Result != nil && reply.Result.Permission >= newPerm {
+	if result.Permission >= newPerm {
 		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "request_redundant"}), http.StatusSeeOther)
 		return
 	}
 
-	message, err := s.writeMessage(ident, userState, repo, newPerm)
+	// Create webhook message
+	message, err := s.writeMessage(ident, result.Username, repo, newPerm)
 	if err != nil {
 		log.Println("Failed to create webhook message:", err)
 		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
@@ -104,7 +95,7 @@ func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) 
 	http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "request_success"}), http.StatusSeeOther)
 }
 
-func (s *Server) writeMessage(ident *common.Identity, userState *common.UserState, repo string, perm ghidra.Permission) (*discord.WebhookMessage, error) {
+func (s *Server) writeMessage(ident *common.Identity, username string, repo string, perm ghidra.Permission) (*discord.WebhookMessage, error) {
 	embedAuthor := discord.EmbedAuthor{
 		Name:    ident.Username,
 		IconURL: fmt.Sprintf("https://cdn.discordapp.com/avatars/%d/%s.png", ident.ID, ident.AvatarHash),
@@ -112,7 +103,7 @@ func (s *Server) writeMessage(ident *common.Identity, userState *common.UserStat
 
 	usernameField := discord.EmbedField{
 		Name:   "Username",
-		Value:  userState.Username,
+		Value:  username,
 		Inline: true,
 	}
 
@@ -135,7 +126,7 @@ func (s *Server) writeMessage(ident *common.Identity, userState *common.UserStat
 	}
 	u = u.JoinPath("repos", url.PathEscape(repo))
 	q := u.Query()
-	q.Set("user", userState.Username)
+	q.Set("user", username)
 	q.Set("role", ghidra.Permission_name[int32(perm)])
 	q.Set("status", "user_prefilled")
 	u.RawQuery = q.Encode()

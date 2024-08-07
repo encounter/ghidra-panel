@@ -138,6 +138,7 @@ func main() {
 		DiscordApp:        app,
 		DiscordWebhookURL: cfg.Discord.WebhookURL,
 		Dev:               *dev,
+		SuperAdmins:       cfg.SuperAdmins,
 	}
 	server, err := web.NewServer(&webConfig, db, auth, &issuer, client)
 	if err != nil {

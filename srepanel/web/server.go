@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -54,6 +55,7 @@ type Config struct {
 	DiscordApp        *discord.Application
 	DiscordWebhookURL string
 	Dev               bool // developer mode
+	SuperAdmins       []uint64
 }
 
 type Server struct {
@@ -192,4 +194,36 @@ func redirectUrl(req *http.Request, params map[string]string) string {
 	}
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+type UserPermissionResult struct {
+	Username   string
+	Permission ghidra.Permission
+}
+
+// fetchUserPermission fetches the user's permission for a repository.
+func (s *Server) fetchUserPermission(req *http.Request, ident *common.Identity, repo string) (*UserPermissionResult, error) {
+	// Fetch user state from the database
+	userState, err := s.DB.GetUserState(req.Context(), ident)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user state: %w", err)
+	}
+
+	// Fetch the user's repository permission by Ghidra username
+	repoUser, err := s.Client.GetRepositoryUser(req.Context(), &ghidra.GetRepositoryUserRequest{
+		Username:   userState.Username,
+		Repository: repo,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository user: %w", err)
+	}
+
+	permission := ghidra.Permission_NONE
+	if repoUser.Result != nil {
+		permission = repoUser.Result.Permission
+	}
+	return &UserPermissionResult{
+		Username:   userState.Username,
+		Permission: permission,
+	}, nil
 }

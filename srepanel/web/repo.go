@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 )
 
@@ -66,11 +67,13 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	}
 
 	// Ensure current user has admin access to the repository
-	var isAdmin bool
-	for _, u := range repo.Users {
-		if u.User.Username == state.UserState.Username && u.Permission == ghidra.Permission_ADMIN {
-			isAdmin = true
-			break
+	isAdmin := slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
+	if !isAdmin {
+		for _, u := range repo.Users {
+			if u.User.Username == state.UserState.Username && u.Permission == ghidra.Permission_ADMIN {
+				isAdmin = true
+				break
+			}
 		}
 	}
 	if !isAdmin {

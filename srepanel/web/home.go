@@ -2,9 +2,11 @@ package web
 
 import (
 	"go.mkw.re/ghidra-panel/common"
+	"go.mkw.re/ghidra-panel/ghidra"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -15,6 +17,7 @@ type HomeState struct {
 	GhidraUsername string
 	GhidraVersion  string
 	Repos          []string
+	SuperAdmin     bool
 }
 
 func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
@@ -27,6 +30,7 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 	if !s.authenticateState(wr, req, state.State) {
 		return
 	}
+	state.SuperAdmin = slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
 
 	// Fetch repository and user information from Ghidra
 	reply, err := s.Client.GetRepositoriesAndUsers(req.Context(), &emptypb.Empty{})
@@ -50,13 +54,22 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 	// Query for repository access
 	state.ACL = make([]common.UserRepoAccessDisplay, 0)
 	for _, r := range reply.Repositories {
+		acl := common.UserRepoAccessDisplay{
+			Repo:    r.Name,
+			Perm:    ghidra.Permission_NONE,
+			IsAdmin: state.SuperAdmin,
+		}
 		for _, u := range r.Users {
 			if strings.EqualFold(u.User.Username, state.UserState.Username) {
-				state.ACL = append(state.ACL, common.UserRepoAccessDisplay{
-					Repo: r.Name,
-					Perm: u.Permission,
-				})
+				acl.Perm = u.Permission
+				if u.Permission == ghidra.Permission_ADMIN {
+					acl.IsAdmin = true
+				}
+				break
 			}
+		}
+		if acl.IsAdmin || acl.Perm != ghidra.Permission_NONE {
+			state.ACL = append(state.ACL, acl)
 		}
 	}
 	sort.Slice(state.ACL, func(i, j int) bool { return lessCaseInsensitive(state.ACL[i].Repo, state.ACL[j].Repo) })

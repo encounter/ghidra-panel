@@ -4,6 +4,7 @@ import (
 	"go.mkw.re/ghidra-panel/ghidra"
 	"log"
 	"net/http"
+	"slices"
 )
 
 func (s *Server) handleSetUserAccess(wr http.ResponseWriter, req *http.Request) {
@@ -39,37 +40,31 @@ func (s *Server) handleSetUserAccess(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// Fetch user state from the database
-	userState, err := s.DB.GetUserState(req.Context(), ident)
-	if err != nil {
-		log.Println("Failed to get user state:", err)
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
-		return
-	}
+	// Allow super admins to set permissions for any user
+	if !slices.Contains(s.Config.SuperAdmins, ident.ID) {
+		// Fetch user state from the database and Ghidra
+		result, err := s.fetchUserPermission(req, ident, repo)
+		if err != nil {
+			log.Println("Failed to get repository user:", err)
+			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+			return
+		}
 
-	// Don't allow users to change their own permissions
-	if user == userState.Username {
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "self_access"}), http.StatusSeeOther)
-		return
-	}
+		// Don't allow users to change their own permissions
+		if user == result.Username {
+			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "self_access"}), http.StatusSeeOther)
+			return
+		}
 
-	// Verify the user has admin access to the repository
-	repoUser, err := s.Client.GetRepositoryUser(req.Context(), &ghidra.GetRepositoryUserRequest{
-		Username:   userState.Username,
-		Repository: repo,
-	})
-	if err != nil {
-		log.Println("Failed to get repository user:", err)
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
-		return
-	}
-	if repoUser.Result == nil || repoUser.Result.Permission != ghidra.Permission_ADMIN {
-		http.Error(wr, "Forbidden", http.StatusForbidden)
-		return
+		// Verify the user has admin access to the repository
+		if result.Permission != ghidra.Permission_ADMIN {
+			http.Error(wr, "Forbidden", http.StatusForbidden)
+			return
+		}
 	}
 
 	// Update the user's permission in Ghidra
-	_, err = s.Client.SetUserPermission(req.Context(), &ghidra.SetUserPermissionRequest{
+	_, err := s.Client.SetUserPermission(req.Context(), &ghidra.SetUserPermissionRequest{
 		Username:   user,
 		Repository: repo,
 		Permission: newPerm,

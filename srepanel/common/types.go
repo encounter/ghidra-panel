@@ -24,8 +24,9 @@ type Link struct {
 }
 
 type UserRepoAccessDisplay struct {
-	Repo string
-	Perm ghidra.Permission
+	Repo    string
+	Perm    ghidra.Permission
+	IsAdmin bool
 }
 
 type RepoUserAccessDisplay struct {

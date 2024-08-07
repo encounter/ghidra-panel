@@ -13,12 +13,15 @@
   <article>
     <header>
       <strong>Repository Access</strong>
+      {{ if .SuperAdmin }}
+      <small style="color: {{ permColor 2 }}">(Super admin mode)</small>
+      {{ end }}
     </header>
     {{ if .ACL | len  }}
     <ul class="list">
       {{ range $repo := .ACL }}
       <li>
-        {{ if eq .Perm 2 }}
+        {{ if .IsAdmin }}
         <a href="/repos/{{ .Repo }}"><samp>{{ .Repo }}</samp></a>
         {{ else }}
         <samp>{{ .Repo }}</samp>

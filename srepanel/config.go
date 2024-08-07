@@ -12,15 +12,14 @@ type config struct {
 		BotToken     string `json:"bot_token"`
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
-		// TODO allow for more general webhooks
-		// For now, we assume that the webhook is for Discord
-		WebhookURL string `json:"webhook_url"`
+		WebhookURL   string `json:"webhook_url"`
 	} `json:"discord"`
 	Ghidra struct {
 		Endpoint common.GhidraEndpoint `json:"endpoint"`
 		GRPCAddr string                `json:"grpc_addr"`
 	} `json:"ghidra"`
-	Links []common.Link `json:"links"`
+	Links       []common.Link `json:"links"`
+	SuperAdmins []uint64      `json:"super_admins"`
 }
 
 func (c *config) validate() {

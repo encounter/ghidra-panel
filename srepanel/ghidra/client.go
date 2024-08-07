@@ -43,6 +43,7 @@ var colorForPerm = map[Permission]int{
 	Permission_READ_ONLY: 0x22bb33,
 	Permission_WRITE:     0x5bc0de,
 	Permission_ADMIN:     0xbb2124,
+	Permission_NONE:      0x999999,
 }
 
 func PermColor(perm Permission) int {
