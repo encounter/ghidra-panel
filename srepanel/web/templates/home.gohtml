@@ -52,6 +52,8 @@
         </select>
         <button role="button" type="submit" class="outline">Request</button>
       </div>
+      <br>
+      <small>To create a repository first connect to ghidra.decomp.dev using the Connection Information to the right. Ghidra will then prompt you to create a new repository.</small>
     </form>
     {{ end }}
   </article>
@@ -92,17 +94,17 @@
       <div class="grid">
         <label for="hostname">
           Hostname
-          <input id="hostname" type="text" value="{{ .Ghidra.Hostname }}" disabled>
+          <input id="hostname" type="text" value="{{ .Ghidra.Hostname }}" readonly>
         </label>
         <label for="port">
           Port
-          <input id="port" type="text" value="{{ .Ghidra.Port }}" disabled>
+          <input id="port" type="text" value="{{ .Ghidra.Port }}" readonly>
         </label>
       </div>
       <small>Server version: {{ .GhidraVersion }}</small>
 
       <label for="update-username">Username</label>
-      <input id="update-username" type="text" name="username" value="{{ .UserState.Username }}" disabled>
+      <input id="update-username" type="text" name="username" value="{{ .UserState.Username }}" readonly>
       <small>Username is case-sensitive and cannot be changed.</small>
 
       <label for="update-password">Password</label>
